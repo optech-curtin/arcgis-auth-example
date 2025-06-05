@@ -1,103 +1,168 @@
-import Image from "next/image";
+// src/app/page.tsx
+"use client";
 
-export default function Home() {
+import { useEffect, useState } from "react";
+
+// We only import ArcGIS types here—no runtime imports at the top level
+import type OAuthInfoType from "@arcgis/core/identity/OAuthInfo";
+import type IdentityManagerType from "@arcgis/core/identity/IdentityManager";
+import type PortalType from "@arcgis/core/portal/Portal";
+
+// Now import the ArcGISMap component from our components folder
+import ArcGISMap from "./components/ArcGISMap";
+
+interface UserInfo {
+  fullName: string;
+  username: string;
+}
+
+export default function HomePage() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Next.js will expose NEXT_PUBLIC_… vars to the browser
+  const portalUrl = process.env.NEXT_PUBLIC_ARCGIS_PORTAL_URL || "";
+  const appId = process.env.NEXT_PUBLIC_ARCGIS_APP_ID || "";
+
+  useEffect(() => {
+    async function initArcGISAuth() {
+      if (!portalUrl || !appId) {
+        console.error("Missing NEXT_PUBLIC_ARCGIS_PORTAL_URL or NEXT_PUBLIC_ARCGIS_APP_ID");
+        setLoading(false);
+        return;
+      }
+
+      // Dynamically import identity modules
+      const [{ default: OAuthInfo }, { default: IdentityManager }, { default: Portal }] = await Promise.all([
+        import("@arcgis/core/identity/OAuthInfo"),
+        import("@arcgis/core/identity/IdentityManager"),
+        import("@arcgis/core/portal/Portal")
+      ]) as [
+        { default: typeof OAuthInfoType },
+        { default: typeof IdentityManagerType },
+        { default: typeof PortalType }
+      ];
+
+      // 1. Create and register our OAuthInfo
+      const oauthInfo = new OAuthInfo({
+        appId: appId,
+        portalUrl: portalUrl,
+        flowType: "auto"
+      });
+      IdentityManager.registerOAuthInfos([oauthInfo]);
+
+      // 2. Check if already signed in
+      try {
+        await IdentityManager.checkSignInStatus(`${portalUrl}/sharing`);
+        // If we get here, there is a valid credential in browser storage
+        const portal = new Portal({
+          authMode: "immediate",
+          url: portalUrl
+        });
+        await portal.load();
+
+        if (portal.user) {
+          setUserInfo({
+            fullName: portal.user.fullName ?? "Unknown User",
+            username: portal.user.username ?? "unknown"
+          });
+          setIsAuthenticated(true);
+        }
+      } catch {
+        // Not signed in yet
+        setIsAuthenticated(false);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    initArcGISAuth();
+  }, [portalUrl, appId]);
+
+  // Trigger OAuth redirect
+  const handleSignIn = async () => {
+    if (!portalUrl) return;
+    const { default: IdentityManager } = await import("@arcgis/core/identity/IdentityManager");
+    IdentityManager.getCredential(`${portalUrl}/sharing`);
+  };
+
+  // Sign out (destroy stored credentials)
+  const handleSignOut = async () => {
+    const { default: IdentityManager } = await import("@arcgis/core/identity/IdentityManager");
+    IdentityManager.destroyCredentials();
+    setIsAuthenticated(false);
+    setUserInfo(null);
+  };
+
+  if (loading) {
+    return (
+      <div style={{ padding: 20 }}>
+        <h2>Loading...</h2>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div style={{ padding: 20 }}>
+        <h2>Sign In to ArcGIS Enterprise</h2>
+        <button
+          onClick={handleSignIn}
+          style={{
+            padding: "10px 20px",
+            fontSize: "1rem",
+            cursor: "pointer",
+            borderRadius: 4,
+            backgroundColor: "#0079c1",
+            color: "#fff",
+            border: "none"
+          }}
+        >
+          Sign In
+        </button>
+      </div>
+    );
+  }
+
+  // Signed in: show header + our WebMap
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <div style={{ height: "100vh", width: "100%" }}>
+      <header
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "10px 20px",
+          backgroundColor: "#f5f5f5",
+          borderBottom: "1px solid #ddd"
+        }}
+      >
+        <div>
+          <strong>
+            Welcome, {userInfo?.fullName} (@{userInfo?.username})
+          </strong>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          onClick={handleSignOut}
+          style={{
+            padding: "6px 12px",
+            fontSize: "0.9rem",
+            cursor: "pointer",
+            borderRadius: 4,
+            backgroundColor: "#d9534f",
+            color: "#fff",
+            border: "none"
+          }}
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+          Sign Out
+        </button>
+      </header>
+
+      {/* Render our WebMap component once authenticated */}
+      <div style={{ height: "calc(100vh - 60px)" }}>
+        <ArcGISMap portalUrl={portalUrl} />
+      </div>
     </div>
   );
 }
