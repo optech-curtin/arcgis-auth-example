@@ -3,12 +3,12 @@
 
 import { useEffect, useState } from "react";
 
-// We only import ArcGIS types here—no runtime imports at the top level
+// We'll dynamically load these modules only in the browser:
 import type OAuthInfoType from "@arcgis/core/identity/OAuthInfo";
 import type IdentityManagerType from "@arcgis/core/identity/IdentityManager";
 import type PortalType from "@arcgis/core/portal/Portal";
 
-// Now import the ArcGISMap component from our components folder
+// Our ArcGISMap component (renders a simple map once authenticated)
 import ArcGISMap from "./components/ArcGISMap";
 
 interface UserInfo {
@@ -21,11 +21,12 @@ export default function HomePage() {
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Next.js will expose NEXT_PUBLIC_… vars to the browser
+  // Read environment variables (Next.js exposes NEXT_PUBLIC_ prefixed vars)
   const portalUrl = process.env.NEXT_PUBLIC_ARCGIS_PORTAL_URL || "";
   const appId = process.env.NEXT_PUBLIC_ARCGIS_APP_ID || "";
 
   useEffect(() => {
+    // Only run on client
     async function initArcGISAuth() {
       if (!portalUrl || !appId) {
         console.error("Missing NEXT_PUBLIC_ARCGIS_PORTAL_URL or NEXT_PUBLIC_ARCGIS_APP_ID");
@@ -33,7 +34,7 @@ export default function HomePage() {
         return;
       }
 
-      // Dynamically import identity modules
+      // Dynamically import ArcGIS Identity modules:
       const [{ default: OAuthInfo }, { default: IdentityManager }, { default: Portal }] = await Promise.all([
         import("@arcgis/core/identity/OAuthInfo"),
         import("@arcgis/core/identity/IdentityManager"),
@@ -44,32 +45,33 @@ export default function HomePage() {
         { default: typeof PortalType }
       ];
 
-      // 1. Create and register our OAuthInfo
+      // 1. Create and register OAuthInfo
       const oauthInfo = new OAuthInfo({
         appId: appId,
         portalUrl: portalUrl,
+        // 'flowType: "auto"' is default; for ArcGIS Enterprise 10.9.1,
+        // it will choose one-step or two-step automatically.
         flowType: "auto"
       });
       IdentityManager.registerOAuthInfos([oauthInfo]);
 
-      // 2. Check if already signed in
+      // 2. Check if already signed in:
       try {
         await IdentityManager.checkSignInStatus(`${portalUrl}/sharing`);
-        // If we get here, there is a valid credential in browser storage
+        // Already signed in! Retrieve portal user info
         const portal = new Portal({
           authMode: "immediate",
           url: portalUrl
         });
         await portal.load();
-
         if (portal.user) {
           setUserInfo({
-            fullName: portal.user.fullName ?? "Unknown User",
-            username: portal.user.username ?? "unknown"
+            fullName: portal.user.fullName ?? 'Unknown User',
+            username: portal.user.username ?? 'unknown'
           });
           setIsAuthenticated(true);
         }
-      } catch {
+      } catch (error) {
         // Not signed in yet
         setIsAuthenticated(false);
       } finally {
@@ -80,15 +82,18 @@ export default function HomePage() {
     initArcGISAuth();
   }, [portalUrl, appId]);
 
-  // Trigger OAuth redirect
+  // Trigger the OAuth redirect to sign in:
   const handleSignIn = async () => {
     if (!portalUrl) return;
+    // Dynamically import IdentityManager so we can call getCredential
     const { default: IdentityManager } = await import("@arcgis/core/identity/IdentityManager");
+
+    // This will redirect the user to your portal's OAuth sign-in page
     IdentityManager.getCredential(`${portalUrl}/sharing`);
   };
 
-  // Sign out (destroy stored credentials)
   const handleSignOut = async () => {
+    // Dynamically import IdentityManager to destroy credentials
     const { default: IdentityManager } = await import("@arcgis/core/identity/IdentityManager");
     IdentityManager.destroyCredentials();
     setIsAuthenticated(false);
@@ -125,7 +130,7 @@ export default function HomePage() {
     );
   }
 
-  // Signed in: show header + our WebMap
+  // If we reach here, the user is signed in.
   return (
     <div style={{ height: "100vh", width: "100%" }}>
       <header
@@ -139,9 +144,7 @@ export default function HomePage() {
         }}
       >
         <div>
-          <strong>
-            Welcome, {userInfo?.fullName} (@{userInfo?.username})
-          </strong>
+          <strong>Welcome, {userInfo?.fullName} (@{userInfo?.username})</strong>
         </div>
         <button
           onClick={handleSignOut}
@@ -159,7 +162,7 @@ export default function HomePage() {
         </button>
       </header>
 
-      {/* Render our WebMap component once authenticated */}
+      {/* Once signed in, show the map */}
       <div style={{ height: "calc(100vh - 60px)" }}>
         <ArcGISMap portalUrl={portalUrl} />
       </div>

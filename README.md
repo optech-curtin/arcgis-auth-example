@@ -1,36 +1,75 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ArcGIS Enterprise Authentication Example
 
-## Getting Started
+This is a Next.js application demonstrating how to implement ArcGIS Enterprise authentication using OAuth 2.0. The example shows how to:
+- Set up OAuth authentication with ArcGIS Enterprise
+- Handle user sign-in and sign-out
+- Display user information
+- Render an ArcGIS Map after authentication
 
-First, run the development server:
+## Prerequisites
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- Node.js 18+ and npm
+- An ArcGIS Enterprise portal
+- A registered application in your ArcGIS Enterprise portal
+
+## Environment Setup
+
+Create a `.env.local` file in the root directory with your ArcGIS Enterprise credentials:
+
+```env
+NEXT_PUBLIC_ARCGIS_PORTAL_URL=https://your-enterprise-portal.com/portal
+NEXT_PUBLIC_ARCGIS_APP_ID=your-app-id
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Installation
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Clone the repository
+2. Install dependencies:
+```bash
+npm install
+```
+3. Start the development server:
+```bash
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Key Features
 
-## Learn More
+### Authentication Flow
+- Uses OAuth 2.0 for secure authentication
+- Supports both one-step and two-step authentication flows
+- Automatically detects the appropriate flow type for your ArcGIS Enterprise version
 
-To learn more about Next.js, take a look at the following resources:
+### User Management
+- Displays user's full name and username after successful authentication
+- Provides sign-in and sign-out functionality
+- Handles authentication state management
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Map Integration
+- Renders an ArcGIS Map component after successful authentication
+- Uses the authenticated session for secure map operations
+- Implements proper cleanup on component unmount
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Project Structure
 
-## Deploy on Vercel
+```
+src/
+├── app/
+│   ├── components/
+│   │   └── ArcGISMap.tsx    # Map component
+│   ├── layout.tsx           # Root layout with ArcGIS CSS
+│   └── page.tsx            # Main page with auth logic
+└── ...
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Dependencies
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Next.js 14+
+- @arcgis/core - ArcGIS Maps SDK for JavaScript
+- React 18+
+
+## Security Notes
+
+- Environment variables are prefixed with `NEXT_PUBLIC_` for client-side access
+- OAuth credentials are managed securely through the ArcGIS Identity Manager
+- No sensitive information is stored in the application
